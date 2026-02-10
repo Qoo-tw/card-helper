@@ -48,5 +48,15 @@
     "cap_reward": 300,
     "cap_spend": 3333,
     "priority": 90
-  }
+  },
+  {
+  "rule_id": "R_HZ_3",
+  "card": "匯鑽卡",
+  "rule_name": "指定通路3%",
+  "rate": 0.03,
+  "regions": ["國內","國外"],
+  "cap_reward": 2000,
+  "cap_spend": 66666,
+  "priority": 3
+}
 ]
