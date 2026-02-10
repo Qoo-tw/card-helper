@@ -24,7 +24,7 @@
     "card": "大戶黑卡",
     "rule_name": "加碼2.5%",
     "rate": 0.025,
-    "regions": ["國內","國外"],
+    "regions": ["國內", "國外"],
     "cap_reward": 400,
     "cap_spend": 16000,
     "priority": 30
@@ -34,29 +34,21 @@
     "card": "幣倍卡(美元)",
     "rule_name": "精選通路4%",
     "rate": 0.04,
-    "regions": ["國內","國外"],
+    "regions": ["國內", "國外"],
     "cap_reward": 800,
     "cap_spend": 20000,
-    "priority": 80
+    "priority": 80,
+    "requires_map": true
   },
   {
     "rule_id": "R_ECO_9",
     "card": "星展eco永續極簡卡",
     "rule_name": "指定店家9%",
     "rate": 0.09,
-    "regions": ["國內","國外"],
+    "regions": ["國內", "國外"],
     "cap_reward": 300,
     "cap_spend": 3333,
-    "priority": 90
-  },
-  {
-  "rule_id": "R_HZ_3",
-  "card": "匯鑽卡",
-  "rule_name": "指定通路3%",
-  "rate": 0.03,
-  "regions": ["國內","國外"],
-  "cap_reward": 2000,
-  "cap_spend": 66666,
-  "priority": 3
-}
+    "priority": 90,
+    "requires_map": true
+  }
 ]
