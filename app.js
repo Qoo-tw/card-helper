@@ -64,6 +64,59 @@ function calcBestRule(merchant, region, amount, ym){
     return okRegion;
   });
 
+  function compute(r){
+    const u = used[r.rule_id] || { used_reward:0, used_spend:0 };
+    const remainReward = (r.cap_reward ?? 0) - (u.used_reward || 0);
+    const remainSpend  = (r.cap_spend  ?? 0) - (u.used_spend  || 0);
+
+    // 這筆最多能放進此規則的可刷金額（刷滿就會變 0）
+    const effSpend = Math.max(0, Math.min(amount, remainSpend));
+    // 估算回饋：同時受 remainSpend & remainReward 限制
+    const estReward = Math.max(0, Math.min(effSpend * r.rate, remainReward));
+
+    const exhausted = (effSpend <= 0) || (remainReward <= 0) || (estReward <= 0);
+
+    return { r, u, remainReward, remainSpend, effSpend, estReward, exhausted };
+  }
+
+  function score(info){
+    // 命中 rule_id 的加分（你若不想鎖死，可把 1e6 改小）
+    const hintBoost = (hintedRuleId && info.r.rule_id === hintedRuleId) ? 1e6 : 0;
+
+    // ⚠️ 關鍵：刷滿/沒回饋的規則要大幅降權，避免「回饋=0 仍被推薦」
+    // 用 -1e12 確保不會被 priority 輾壓回第一名
+    const exhaustedPenalty = info.exhausted ? -1e12 : 0;
+
+    return exhaustedPenalty + hintBoost + (info.r.priority || 0) * 1000 + info.estReward;
+  }
+
+  const infos = candidates.map(compute);
+  infos.sort((a,b)=> score(b) - score(a));
+
+  if (!infos.length) return null;
+
+  const top = infos[0];
+  // 先拿到「可回饋」的第一名（若 top 已刷滿，會自動往下找）
+  const bestInfo = infos.find(x => !x.exhausted) || top;
+
+  // 給 UI 用：如果 top 被跳過，帶一段提示文字
+  let note = "";
+  if (bestInfo.r.rule_id !== top.r.rule_id && top.exhausted) {
+    note = `注意：原本最優先的「${top.r.card} / ${top.r.rule_name}」本月已刷滿或無回饋，已自動改推薦下一張。`;
+  } else if (bestInfo.exhausted) {
+    // 全部都刷滿/無回饋時：至少仍回傳 top，讓 UI 不會壞掉
+    note = "提醒：目前所有符合條件的規則本月都已刷滿或無回饋，以下僅顯示優先級最高的規則（回饋可能為 0）。";
+  }
+
+  return {
+    best: bestInfo.r,
+    estReward: bestInfo.estReward,
+    remainReward: bestInfo.remainReward,
+    remainSpend: bestInfo.remainSpend,
+    note
+  };
+}
+
   function scoreRule(r){
     const u = used[r.rule_id] || { used_reward:0, used_spend:0 };
     const remainReward = (r.cap_reward ?? 0) - (u.used_reward || 0);
@@ -187,3 +240,4 @@ async function init(){
 }
 
 init();
+
