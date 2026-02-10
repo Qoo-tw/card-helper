@@ -1,54 +1,23 @@
-[
-  {
-    "rule_id": "R_BH_DOM",
-    "card": "大戶黑卡",
-    "rule_name": "國內一般1%",
-    "rate": 0.01,
-    "regions": ["國內"],
-    "cap_reward": 999999,
-    "cap_spend": 999999,
-    "priority": 10
-  },
-  {
-    "rule_id": "R_BH_FOR",
-    "card": "大戶黑卡",
-    "rule_name": "國外一般2%",
-    "rate": 0.02,
-    "regions": ["國外"],
-    "cap_reward": 999999,
-    "cap_spend": 999999,
-    "priority": 10
-  },
-  {
-    "rule_id": "R_BH_25",
-    "card": "大戶黑卡",
-    "rule_name": "加碼2.5%",
-    "rate": 0.025,
-    "regions": ["國內", "國外"],
-    "cap_reward": 400,
-    "cap_spend": 16000,
-    "priority": 30
-  },
-  {
-    "rule_id": "R_USD_SEL",
-    "card": "幣倍卡(美元)",
-    "rule_name": "精選通路4%",
-    "rate": 0.04,
-    "regions": ["國內", "國外"],
-    "cap_reward": 800,
-    "cap_spend": 20000,
-    "priority": 80,
-    "requires_map": true
-  },
-  {
-    "rule_id": "R_ECO_9",
-    "card": "星展eco永續極簡卡",
-    "rule_name": "指定店家9%",
-    "rate": 0.09,
-    "regions": ["國內", "國外"],
-    "cap_reward": 300,
-    "cap_spend": 3333,
-    "priority": 90,
-    "requires_map": true
-  }
-]
+const CACHE = "card-helper-v6";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./styles.css",
+  "./app.js",
+  "./manifest.json",
+  "./data/rules.json",
+  "./data/merchantmap.json"
+];
+
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+});
+
+self.addEventListener("fetch", (e) => {
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request))
+  );
+});
+
+
+
