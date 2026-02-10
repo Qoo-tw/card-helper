@@ -1,3 +1,8 @@
+// app.js - 刷卡助手（全新整理版）
+// 重點：當規則本月已刷滿/已無回饋時，自動跳過，改推薦下一張
+
+"use strict";
+
 let RULES = [];
 let MAP = [];
 let lastRecommendation = null;
@@ -8,55 +13,60 @@ const msg = (t) => { $("msg").textContent = t || ""; };
 const ymKey = (d) => {
   const dt = new Date(d);
   const y = dt.getFullYear();
-  const m = String(dt.getMonth()+1).padStart(2,"0");
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 };
 
 const storeKeyTx = (ym) => `tx:${ym}`;
 const storeKeyUsed = (ym) => `used:${ym}`; // by rule_id
 
-function loadUsed(ym){
+function loadUsed(ym) {
   return JSON.parse(localStorage.getItem(storeKeyUsed(ym)) || "{}");
 }
-function saveUsed(ym, used){
+function saveUsed(ym, used) {
   localStorage.setItem(storeKeyUsed(ym), JSON.stringify(used));
 }
-function loadTx(ym){
+function loadTx(ym) {
   return JSON.parse(localStorage.getItem(storeKeyTx(ym)) || "[]");
 }
-function saveTx(ym, tx){
+function saveTx(ym, tx) {
   localStorage.setItem(storeKeyTx(ym), JSON.stringify(tx));
 }
 
-function normalize(s){
+function normalize(s) {
   return (s || "").toString().trim().toLowerCase();
 }
 
-function autoRegion(merchant){
+function autoRegion(merchant) {
   const m = normalize(merchant);
   if (!m) return "";
   // 找到第一個包含命中的 keyword（你可用更長 keyword 放前面提高命中精準）
-  for (const row of MAP){
+  for (const row of MAP) {
     const kw = normalize(row.keyword);
     if (kw && m.includes(kw)) return row.default_region || "";
   }
   return "";
 }
 
-function mapRuleId(merchant){
+function mapRuleId(merchant) {
   const m = normalize(merchant);
   if (!m) return "";
-  for (const row of MAP){
+  for (const row of MAP) {
     const kw = normalize(row.keyword);
     if (kw && m.includes(kw)) return row.rule_id || "";
   }
   return "";
 }
 
-function calcBestRule(merchant, region, amount, ym){
+/**
+ * 挑出最佳規則：
+ * - 先依 region 過濾候選
+ * - 計算每條規則「本筆可刷金額 effSpend」與「本筆估算回饋 estReward」
+ * - 若規則已刷滿/已無回饋（exhausted），會自動跳過，改選下一張
+ * - 仍保留 merchantmap 命中 rule_id 的偏好（可自行調整 hintBoost 強度）
+ */
+function calcBestRule(merchant, region, amount, ym) {
   const used = loadUsed(ym);
-
-  // 先看 MerchantMap 是否直接指到某個 rule_id（指定店家/精選通路）
   const hintedRuleId = mapRuleId(merchant);
 
   const candidates = RULES.filter(r => {
@@ -64,47 +74,51 @@ function calcBestRule(merchant, region, amount, ym){
     return okRegion;
   });
 
-  function compute(r){
-    const u = used[r.rule_id] || { used_reward:0, used_spend:0 };
-    const remainReward = (r.cap_reward ?? 0) - (u.used_reward || 0);
-    const remainSpend  = (r.cap_spend  ?? 0) - (u.used_spend  || 0);
+  if (!candidates.length) return null;
 
-    // 這筆最多能放進此規則的可刷金額（刷滿就會變 0）
+  function compute(r) {
+    const u = used[r.rule_id] || { used_reward: 0, used_spend: 0 };
+
+    const capReward = (r.cap_reward ?? 0);
+    const capSpend  = (r.cap_spend ?? 0);
+
+    const remainReward = capReward - (u.used_reward || 0);
+    const remainSpend  = capSpend  - (u.used_spend || 0);
+
+    // 本筆最多能放進此規則的可刷金額（刷滿就會變 0）
     const effSpend = Math.max(0, Math.min(amount, remainSpend));
-    // 估算回饋：同時受 remainSpend & remainReward 限制
-    const estReward = Math.max(0, Math.min(effSpend * r.rate, remainReward));
 
+    // 估算回饋：同時受 remainSpend & remainReward 限制
+    const estReward = Math.max(0, Math.min(effSpend * (r.rate || 0), remainReward));
+
+    // exhausted：本月已刷滿 / 已無回饋（不該再被推薦）
     const exhausted = (effSpend <= 0) || (remainReward <= 0) || (estReward <= 0);
 
     return { r, u, remainReward, remainSpend, effSpend, estReward, exhausted };
   }
 
-  function score(info){
-    // 命中 rule_id 的加分（你若不想鎖死，可把 1e6 改小）
+  function score(info) {
+    // 命中 rule_id 的加分（目前是「強偏好」，若不想鎖死可改小，例如 500 或 2000）
     const hintBoost = (hintedRuleId && info.r.rule_id === hintedRuleId) ? 1e6 : 0;
 
-    // ⚠️ 關鍵：刷滿/沒回饋的規則要大幅降權，避免「回饋=0 仍被推薦」
+    // 關鍵：刷滿/沒回饋的規則要大幅降權，避免「回饋=0 仍被推薦」
     // 用 -1e12 確保不會被 priority 輾壓回第一名
     const exhaustedPenalty = info.exhausted ? -1e12 : 0;
 
+    // priority 其次，最後用估算回饋做 tie-break
     return exhaustedPenalty + hintBoost + (info.r.priority || 0) * 1000 + info.estReward;
   }
 
   const infos = candidates.map(compute);
-  infos.sort((a,b)=> score(b) - score(a));
-
-  if (!infos.length) return null;
+  infos.sort((a, b) => score(b) - score(a));
 
   const top = infos[0];
-  // 先拿到「可回饋」的第一名（若 top 已刷滿，會自動往下找）
   const bestInfo = infos.find(x => !x.exhausted) || top;
 
-  // 給 UI 用：如果 top 被跳過，帶一段提示文字
   let note = "";
   if (bestInfo.r.rule_id !== top.r.rule_id && top.exhausted) {
     note = `注意：原本最優先的「${top.r.card} / ${top.r.rule_name}」本月已刷滿或無回饋，已自動改推薦下一張。`;
   } else if (bestInfo.exhausted) {
-    // 全部都刷滿/無回饋時：至少仍回傳 top，讓 UI 不會壞掉
     note = "提醒：目前所有符合條件的規則本月都已刷滿或無回饋，以下僅顯示優先級最高的規則（回饋可能為 0）。";
   }
 
@@ -117,36 +131,7 @@ function calcBestRule(merchant, region, amount, ym){
   };
 }
 
-  function scoreRule(r){
-    const u = used[r.rule_id] || { used_reward:0, used_spend:0 };
-    const remainReward = (r.cap_reward ?? 0) - (u.used_reward || 0);
-    const remainSpend  = (r.cap_spend  ?? 0) - (u.used_spend  || 0);
-
-    const effSpend = Math.max(0, Math.min(amount, remainSpend));
-    const est = Math.max(0, Math.min(effSpend * r.rate, remainReward));
-
-    // 指定命中 rule_id 給超大加分
-    const hintBoost = (hintedRuleId && r.rule_id === hintedRuleId) ? 1e6 : 0;
-
-    // priority 其次，最後用估算回饋做 tie-break
-    return hintBoost + (r.priority || 0)*1000 + est;
-  }
-
-  candidates.sort((a,b)=> scoreRule(b)-scoreRule(a));
-
-  const best = candidates[0];
-  if (!best) return null;
-
-  const u = used[best.rule_id] || { used_reward:0, used_spend:0 };
-  const remainReward = (best.cap_reward ?? 0) - (u.used_reward || 0);
-  const remainSpend  = (best.cap_spend  ?? 0) - (u.used_spend  || 0);
-  const effSpend = Math.max(0, Math.min(amount, remainSpend));
-  const estReward = Math.max(0, Math.min(effSpend * best.rate, remainReward));
-
-  return { best, estReward, remainReward, remainSpend };
-}
-
-function renderTx(){
+function renderTx() {
   const ym = ymKey($("date").value);
   const tx = loadTx(ym);
   $("txList").innerHTML = tx.slice().reverse().map(t => `
@@ -157,38 +142,44 @@ function renderTx(){
   `).join("") || "<div class='item'>本月尚無紀錄</div>";
 }
 
-async function init(){
+async function init() {
   // default date today
   const today = new Date();
-  $("date").value = today.toISOString().slice(0,10);
+  $("date").value = today.toISOString().slice(0, 10);
 
   // load data
-  RULES = await fetch("./data/rules.json").then(r=>r.json());
-  MAP = await fetch("./data/merchantmap.json").then(r=>r.json());
+  try {
+    RULES = await fetch("./data/rules.json", { cache: "no-store" }).then(r => r.json());
+    MAP = await fetch("./data/merchantmap.json", { cache: "no-store" }).then(r => r.json());
+  } catch (e) {
+    console.error(e);
+    msg("載入規則失敗：請確認 data/rules.json 與 data/merchantmap.json 路徑正確，並重新整理。");
+    return;
+  }
 
   // auto region when typing merchant
-  $("merchant").addEventListener("input", ()=>{
+  $("merchant").addEventListener("input", () => {
     const ar = autoRegion($("merchant").value);
     if (ar) $("region").value = ar; // 自動填，但你仍可手動改
   });
 
-  $("btnRecommend").addEventListener("click", ()=>{
+  $("btnRecommend").addEventListener("click", () => {
     const merchant = $("merchant").value.trim();
     const amount = Number($("amount").value || 0);
     let region = $("region").value;
 
-    if (!merchant){ msg("請輸入店家/描述"); return; }
-    if (!(amount > 0)){ msg("請輸入正確金額"); return; }
+    if (!merchant) { msg("請輸入店家/描述"); return; }
+    if (!(amount > 0)) { msg("請輸入正確金額"); return; }
 
     // 若 region 還空，嘗試自動
-    if (!region){
+    if (!region) {
       region = autoRegion(merchant) || "國內";
       $("region").value = region;
     }
 
     const ym = ymKey($("date").value);
     const out = calcBestRule(merchant, region, amount, ym);
-    if (!out){ msg("找不到可用規則"); return; }
+    if (!out) { msg("找不到可用規則"); return; }
 
     lastRecommendation = {
       date: $("date").value,
@@ -207,18 +198,23 @@ async function init(){
     $("outRemainReward").textContent = String(lastRecommendation.remain_reward);
     $("outRemainSpend").textContent = String(lastRecommendation.remain_spend);
 
-    msg("已更新推薦（可按「記一筆」累加）");
+    // ✅ 這行很重要：顯示跳過刷滿規則的原因
+    msg(out.note || "已更新推薦（可按「記一筆」累加）");
   });
 
-  $("btnAdd").addEventListener("click", ()=>{
-    if (!lastRecommendation){ msg("請先按「推薦」"); return; }
+  $("btnAdd").addEventListener("click", () => {
+    if (!lastRecommendation) { msg("請先按「推薦」"); return; }
+
     const ym = ymKey(lastRecommendation.date);
+
+    // append tx
     const tx = loadTx(ym);
     tx.push(lastRecommendation);
     saveTx(ym, tx);
 
+    // update used
     const used = loadUsed(ym);
-    const u = used[lastRecommendation.rule_id] || { used_reward:0, used_spend:0 };
+    const u = used[lastRecommendation.rule_id] || { used_reward: 0, used_spend: 0 };
     u.used_reward += Number(lastRecommendation.est_reward || 0);
     u.used_spend  += Number(lastRecommendation.amount || 0);
     used[lastRecommendation.rule_id] = u;
@@ -228,7 +224,7 @@ async function init(){
     renderTx();
   });
 
-  $("btnReset").addEventListener("click", ()=>{
+  $("btnReset").addEventListener("click", () => {
     const ym = ymKey($("date").value);
     localStorage.removeItem(storeKeyTx(ym));
     localStorage.removeItem(storeKeyUsed(ym));
@@ -240,4 +236,3 @@ async function init(){
 }
 
 init();
-
