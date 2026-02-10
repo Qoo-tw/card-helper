@@ -1,4 +1,4 @@
-const CACHE = "card-helper-v2";
+const CACHE = "card-helper-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -18,4 +18,5 @@ self.addEventListener("fetch", (e) => {
     caches.match(e.request).then(r => r || fetch(e.request))
   );
 });
+
 
