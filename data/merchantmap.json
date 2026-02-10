@@ -68,6 +68,9 @@
   {"rule_id":"R_HZ_3","keyword":"Farfetch","default_region":"國外"},
   {"rule_id":"R_HZ_3","keyword":"momo購物網","default_region":"國內"},
   {"rule_id":"R_HZ_3","keyword":"Uber Eats","default_region":"國內"},
+  {"rule_id":"R_HZ_3","keyword":"momo","default_region":"國內"},
+  {"rule_id":"R_HZ_3","keyword":"MOMO","default_region":"國內"},
+  {"rule_id":"R_HZ_3","keyword":"UberEats","default_region":"國內"},
 
   {"rule_id":"R_ECO_9","keyword":"鮮乳坊","default_region":"國內"},
   {"rule_id":"R_ECO_9","keyword":"綠藤生物科技","default_region":"國內"},
