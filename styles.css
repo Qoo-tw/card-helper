@@ -1,0 +1,18 @@
+:root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif; }
+body { margin:0; background:#0a0f16; color:#e8eef7; }
+header { padding:16px 16px 8px; background:#0b1f3a; border-bottom:1px solid rgba(255,255,255,.08); }
+h1 { margin:0; font-size:20px; }
+.sub { opacity:.8; font-size:12px; margin-top:6px; }
+main { padding:12px; max-width:860px; margin:0 auto; }
+.card { background:#0f1722; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:14px; margin-bottom:12px; }
+label { display:block; font-size:12px; opacity:.85; margin-top:10px; }
+input, select { width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#0b1220; color:#e8eef7; }
+.row { display:flex; gap:10px; margin-top:12px; }
+.col { flex:1; }
+button { padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#1b3a6b; color:white; font-weight:600; cursor:pointer; flex:1; }
+button.secondary { background:#243245; }
+button.danger { background:#6b1b1b; }
+.msg { margin-top:10px; font-size:12px; opacity:.9; }
+.result .k { opacity:.8; }
+.tx { font-size:12px; line-height:1.6; opacity:.95; }
+.tx .item { padding:8px 0; border-bottom:1px dashed rgba(255,255,255,.12); }
